@@ -4,11 +4,7 @@ This is a small modding uility I wrote for my friends and me to make our lives e
 
 **Table of Contents**
 
-[TOCM]
-
-[TOC]
-
-###Features
+### Features
 - Download and installation of given packs
 - Automatic update to the most recent version
 - Local file verification
