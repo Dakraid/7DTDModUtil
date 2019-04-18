@@ -22,6 +22,7 @@ import (
 	"github.com/sger/go-hashdir"
 )
 
+// Type definition for the XML data
 type preset struct {
 	XMLName xml.Name `xml:"preset"`
 	Durl    string   `xml:"durl"`
@@ -42,26 +43,43 @@ type modutil struct {
 	User    user     `xml:"user"`
 }
 
+// Specify the log file location
 const logPath = "output.log"
 
+// Variable declaration
 var (
-	inDir                      = &nucular.TextEditor{}
-	v                          = modutil{}
+	// Flags for the logger setting up the verbose level
 	verbose                    = flag.Bool("verbose", false, "print info level logs to stdout")
+
+	inDir                      = &nucular.TextEditor{}
+	resp                       = &grab.Response{}
+	conf                        = modutil{}
 	isLoaded, imsg, dmsg, prog = false, "Integrity Check", "Welcome", 0
+
+	// Colors to be used for dcolor
 	green                      = color.RGBA{100, 255, 100, 255}
 	red                        = color.RGBA{255, 100, 100, 255}
 	white                      = color.RGBA{255, 255, 255, 255}
+
+	// Color variable used for coloration of the status ticker
 	dcolor                     = white
-	resp                       = &grab.Response{}
 )
 
+// Error check function
+// Mainly for cleanliness
 func check(e error) {
 	if e != nil {
 		logger.Fatalf(e.Error())
 	}
 }
 
+////////////////////
+// Main Functions //
+////////////////////
+
+// Main function of the program
+// Sets up the logger, reads the config files, and sets up the UI
+// then all work is passed to the UI update function and buttons
 func main() {
 	flag.Parse()
 
@@ -86,6 +104,9 @@ func main() {
 	wnd.Main()
 }
 
+// UI function
+// Handles drawing and assignment of interaction
+// Called through user interaction or refreshed automatically once per second
 func updatefn(w *nucular.Window) {
 	w.Row(10).Dynamic(1)
 
@@ -149,6 +170,11 @@ func updatefn(w *nucular.Window) {
 	}
 }
 
+//////////////////////
+// Reused functions //
+//////////////////////
+
+// Handles the download of the primary XML through HTTP
 func downloadPreset() {
 	if _, err := os.Stat("preset.xml"); err != nil {
 		if os.IsNotExist(err) {
@@ -167,44 +193,11 @@ func downloadPreset() {
 	}
 }
 
-func readConfig(filename string) {
-	downloadPreset()
-	absPath, _ := filepath.Abs(filename)
-	xmlFile, err := os.Open(absPath)
-	check(err)
-	defer xmlFile.Close()
-
-	data, err := ioutil.ReadAll(xmlFile)
-	check(err)
-
-	err = xml.Unmarshal([]byte(data), &v)
-	check(err)
-
-	inDir.InsertMode = true
-	inDir.Cursor = 0
-	inDir.Text([]rune(v.User.Idir))
-
-	isLoaded = true
-}
-
-func writeConfig() {
-	if isLoaded {
-		output, err := xml.MarshalIndent(v, "  ", "    ")
-		check(err)
-
-		absPath, _ := filepath.Abs("user.xml")
-		err = ioutil.WriteFile(absPath, output, 0644)
-		check(err)
-		logger.Info("Finished writing user.xml")
-	} else {
-		logger.Errorf("Please load user.xml before attempting to write")
-	}
-}
-
-func genHash(filedir string, isdir bool) string {
+// Generates a SHA-1 for either a given file or directory, based on the second parameter
+func genHash(filein string, isdir bool) string {
 	var result string
 	if !isdir {
-		f, err := os.Open(filedir)
+		f, err := os.Open(filein)
 		check(err)
 		defer f.Close()
 
@@ -215,37 +208,14 @@ func genHash(filedir string, isdir bool) string {
 
 		result = hex.EncodeToString(h.Sum(nil))
 	} else {
-		hash, err := hashdir.Create(v.User.Idir+"\\Mods", "sha1")
+		hash, err := hashdir.Create(conf.User.Idir+"\\Mods", "sha1")
 		check(err)
 		result = hash
 	}
 	return result
 }
 
-func checkIntegrity() bool {
-	var hash1, hash2, hash3 string
-
-	hash1 = genHash(v.User.Idir+"\\Data\\Config\\Localization.txt", false)
-	hash2 = genHash(v.User.Idir+"\\Data\\Config\\Localization - Quest.txt", false)
-	hash3 = genHash(v.User.Idir+"\\Mods", true)
-
-	logger.Infof("Hash 1: %s | Hash 2: %s | Hash 3: %s", hash1, hash2, hash3)
-
-	pass1 := strings.EqualFold(hash1, v.Preset.Lhash)
-	pass2 := strings.EqualFold(hash2, v.Preset.Qhash)
-	pass3 := strings.EqualFold(hash3, v.Preset.Mhash)
-
-	logger.Infof("Pass 1: %t | Pass 2: %t | Pass 3: %t", pass1, pass2, pass3)
-
-	imsg = fmt.Sprintf("Localization.txt: %t \nLocalization - Quest.txt: %t \nMods: %t", pass1, pass2, pass3)
-
-	if pass1 && pass2 && pass3 {
-		return true
-	}
-
-	return false
-}
-
+// This refreshes the values for the progress display and is called within the main UI function
 func updateProgress() {
 	if !resp.IsComplete() {
 		dmsg = fmt.Sprintf("Transferred %v / %v bytes (%.2f%%)", resp.BytesComplete(), resp.Size, 100*resp.Progress())
@@ -264,6 +234,74 @@ func updateProgress() {
 	}
 }
 
+///////////////
+// Functions //
+///////////////
+
+// Reads the given XML config into v
+func readConfig(filename string) {
+	downloadPreset()
+	absPath, _ := filepath.Abs(filename)
+	xmlFile, err := os.Open(absPath)
+	check(err)
+	defer xmlFile.Close()
+
+	data, err := ioutil.ReadAll(xmlFile)
+	check(err)
+
+	err = xml.Unmarshal([]byte(data), &conf)
+	check(err)
+
+	inDir.InsertMode = true
+	inDir.Cursor = 0
+	inDir.Text([]rune(conf.User.Idir))
+
+	isLoaded = true
+}
+
+// Writes v into user.xml
+func writeConfig() {
+	if isLoaded {
+		output, err := xml.MarshalIndent(conf, "  ", "    ")
+		check(err)
+
+		absPath, _ := filepath.Abs("user.xml")
+		err = ioutil.WriteFile(absPath, output, 0644)
+		check(err)
+		logger.Info("Finished writing user.xml")
+	} else {
+		logger.Errorf("Please load user.xml before attempting to write")
+	}
+}
+
+// Integrity check for the main directories and files
+// We use genHash to generate the SHA-1 hashes for the specified files
+// and compare those with the hashes retrieved from the preset.xml
+func checkIntegrity() bool {
+	var hash1, hash2, hash3 string
+
+	hash1 = genHash(conf.User.Idir+"\\Data\\Config\\Localization.txt", false)
+	hash2 = genHash(conf.User.Idir+"\\Data\\Config\\Localization - Quest.txt", false)
+	hash3 = genHash(conf.User.Idir+"\\Mods", true)
+
+	logger.Infof("Hash 1: %s | Hash 2: %s | Hash 3: %s", hash1, hash2, hash3)
+
+	pass1 := strings.EqualFold(hash1, conf.Preset.Lhash)
+	pass2 := strings.EqualFold(hash2, conf.Preset.Qhash)
+	pass3 := strings.EqualFold(hash3, conf.Preset.Mhash)
+
+	logger.Infof("Pass 1: %t | Pass 2: %t | Pass 3: %t", pass1, pass2, pass3)
+
+	imsg = fmt.Sprintf("Localization.txt: %t \nLocalization - Quest.txt: %t \nMods: %t", pass1, pass2, pass3)
+
+	if pass1 && pass2 && pass3 {
+		return true
+	}
+
+	return false
+}
+
+// Handles the main download for the BASE pack on which everything else is applied on top of
 func downloadBase() {
 	if v.User.Vers < 1 {
 		if _, err := os.Stat("7DTD_BASE.7z"); err != nil {
