@@ -202,6 +202,7 @@ func writeConfig() {
 }
 
 func genHash(filedir string, isdir bool) string {
+	var result string
 	if !isdir {
 		f, err := os.Open(filedir)
 		check(err)
@@ -212,12 +213,13 @@ func genHash(filedir string, isdir bool) string {
 			check(err)
 		}
 
-		return hex.EncodeToString(h.Sum(nil))
+		result = hex.EncodeToString(h.Sum(nil))
 	} else {
 		hash, err := hashdir.Create(v.User.Idir+"\\Mods", "sha1")
 		check(err)
-		return hash
+		result = hash
 	}
+	return result
 }
 
 func checkIntegrity() bool {
