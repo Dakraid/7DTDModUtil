@@ -22,7 +22,7 @@ import (
 	"github.com/sger/go-hashdir"
 )
 
-type Preset struct {
+type preset struct {
 	XMLName xml.Name `xml:"preset"`
 	Durl    string   `xml:"durl"`
 	Lhash   string   `xml:"lhash"`
@@ -30,23 +30,23 @@ type Preset struct {
 	Mhash   string   `xml:"mhash"`
 }
 
-type User struct {
+type user struct {
 	XMLName xml.Name `xml:"user"`
 	Idir    string   `xml:"idir"`
 	Vers    uint8    `xml:"vers"`
 }
 
-type Modutil struct {
+type modutil struct {
 	XMLName xml.Name `xml:"modutil"`
-	Preset  Preset   `xml:"preset"`
-	User    User     `xml:"user"`
+	Preset  preset   `xml:"preset"`
+	User    user     `xml:"user"`
 }
 
 const logPath = "output.log"
 
 var (
 	inDir                      = &nucular.TextEditor{}
-	v                          = Modutil{}
+	v                          = modutil{}
 	verbose                    = flag.Bool("verbose", false, "print info level logs to stdout")
 	isLoaded, imsg, dmsg, prog = false, "Integrity Check", "Welcome", 0
 	green                      = color.RGBA{100, 255, 100, 255}
@@ -75,7 +75,8 @@ func main() {
 
 	wnd := nucular.NewMasterWindow(0, "7DTD ModUtil", updatefn)
 	wnd.SetStyle(style.FromTheme(style.DarkTheme, 1.0))
-	readConfig()
+	readConfig("preset.xml")
+	readConfig("user.xml")
 	go func() {
 		for {
 			time.Sleep(1 * time.Second)
@@ -119,28 +120,56 @@ func updatefn(w *nucular.Window) {
 
 	w.Row(20).Dynamic(1)
 
-	w.Row(40).Dynamic(2)
+	w.Row(30).Dynamic(2)
+	if w.ButtonText("Download Base") {
+		downloadBase()
+	}
+	if w.ButtonText("Download Update") {
+		downloadUpdate()
+	}
+
+	w.Row(30).Dynamic(2)
 	if w.ButtonText("Install Base") {
 		installBase()
 	}
 	if w.ButtonText("Install Update") {
 		installUpdate()
 	}
-	if resp.BytesPerSecond() > 0 {
-		updateProgress()
-	}
 
-	w.Row(40).Dynamic(1)
+	w.Row(20).Dynamic(1)
 
 	w.Row(20).Dynamic(1)
 	w.Progress(&prog, 100, false)
 
 	w.Row(20).Dynamic(1)
 	w.LabelColored(dmsg, "LT", dcolor)
+
+	if resp.BytesPerSecond() > 0 {
+		updateProgress()
+	}
 }
 
-func readConfig() {
-	absPath, _ := filepath.Abs("config.xml")
+func downloadPreset() {
+	if _, err := os.Stat("preset.xml"); err != nil {
+		if os.IsNotExist(err) {
+			client := grab.NewClient()
+			req, _ := grab.NewRequest(".", "https://mods.netrve.net/7D2D/preset.xml")
+			logger.Infof("Downloading %v...", req.URL())
+			dmsg = fmt.Sprintf("Downloading %v...", req.URL())
+			dcolor = green
+			resp = client.Do(req)
+			logger.Infof("  %v", resp.HTTPResponse.Status)
+		}
+	} else {
+		prog = 100
+		dmsg = "Preset.xml already downloaded"
+		dcolor = green
+	}
+}
+
+func readConfig(filename string) {
+	downloadPreset()
+	absPath, _ := filepath.Abs(filename)
 	xmlFile, err := os.Open(absPath)
 	check(err)
 	defer xmlFile.Close()
@@ -163,12 +192,12 @@ func writeConfig() {
 		output, err := xml.MarshalIndent(v, "  ", "    ")
 		check(err)
 
-		absPath, _ := filepath.Abs("config.xml")
+		absPath, _ := filepath.Abs("user.xml")
 		err = ioutil.WriteFile(absPath, output, 0644)
 		check(err)
-		logger.Info("Finished writing config.xml")
+		logger.Info("Finished writing user.xml")
 	} else {
-		logger.Errorf("Please load config.xml before attempting to write")
+		logger.Errorf("Please load user.xml before attempting to write")
 	}
 }
 
@@ -233,28 +262,40 @@ func updateProgress() {
 	}
 }
 
-func installBase() {
+func downloadBase() {
 	if v.User.Vers < 1 {
 		if _, err := os.Stat("7DTD_BASE.7z"); err != nil {
 			if os.IsNotExist(err) {
 				client := grab.NewClient()
 				req, _ := grab.NewRequest(".", v.Preset.Durl+"7DTD_BASE.7z")
-
 				logger.Infof("Downloading %v...", req.URL())
 				dmsg = fmt.Sprintf("Downloading %v...", req.URL())
+				dcolor = green
 				resp = client.Do(req)
 				logger.Infof("  %v", resp.HTTPResponse.Status)
 			}
 		} else {
 			prog = 100
-			dmsg = "Download already completed"
+			dmsg = "7DTD_BASE.7z already downloaded"
 			dcolor = green
 		}
 	}
 }
 
+func downloadUpdate() {
+	if v.User.Vers > 0 {
+		// TODO: Implement Update Download
+	}
+}
+
+func installBase() {
+	if v.User.Vers < 1 {
+		// TODO: Implement Base Install
+	}
+}
+
 func installUpdate() {
-	if v.User.Vers >= 0 {
-		// TODO: Implement Update Routine
+	if v.User.Vers > 0 {
+		// TODO: Implement Update Install
 	}
 }
