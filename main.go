@@ -303,11 +303,11 @@ func checkIntegrity() bool {
 
 // Handles the main download for the BASE pack on which everything else is applied on top of
 func downloadBase() {
-	if v.User.Vers < 1 {
+	if conf.User.Vers < 1 {
 		if _, err := os.Stat("7DTD_BASE.7z"); err != nil {
 			if os.IsNotExist(err) {
 				client := grab.NewClient()
-				req, _ := grab.NewRequest(".", v.Preset.Durl+"7DTD_BASE.7z")
+				req, _ := grab.NewRequest(".", conf.Preset.Durl+"7DTD_BASE.7z")
 				logger.Infof("Downloading %v...", req.URL())
 				dmsg = fmt.Sprintf("Downloading %v...", req.URL())
 				dcolor = green
@@ -323,19 +323,19 @@ func downloadBase() {
 }
 
 func downloadUpdate() {
-	if v.User.Vers > 0 {
+	if conf.User.Vers > 0 {
 		// TODO: Implement Update Download
 	}
 }
 
 func installBase() {
-	if v.User.Vers < 1 {
+	if conf.User.Vers < 1 {
 		// TODO: Implement Base Install
 	}
 }
 
 func installUpdate() {
-	if v.User.Vers > 0 {
+	if conf.User.Vers > 0 {
 		// TODO: Implement Update Install
 	}
 }
