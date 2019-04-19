@@ -21,7 +21,7 @@ It also works as kind of an exercise in Go, which I picked up shortly before I s
 - Patch Routines
 	- Check for base installation
 	- Installation of patches in order
-- Versioning
+- Versions
 	- Used for Base and Patch routines
 	- Defines what is required
 - User Interface Polish
@@ -35,7 +35,6 @@ It also works as kind of an exercise in Go, which I picked up shortly before I s
 - encoding/xml
 - flag
 - fmt
-- image/color
 - io
 - io/ioutil
 - os
@@ -48,4 +47,4 @@ It also works as kind of an exercise in Go, which I picked up shortly before I s
 - github.com/google/logger
 - github.com/sger/go-hashdir
 
-![Go Dependency Graph](https://github.com/Dakraid/7DTDModUtil/blob/master/godepgraph.png "Go Dependency Graph")
+![Go Dependency Graph](https://github.com/Dakraid/7DTDModUtil/blob/master/misc/godepgraph.png "Go Dependency Graph")
