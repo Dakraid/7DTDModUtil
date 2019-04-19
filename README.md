@@ -47,3 +47,4 @@ It also works as kind of an exercise in Go, which I picked up shortly before I s
  - github.com/google/logger
  - github.com/sger/go-hashdir
 
+![Go Dependency Graph](https://github.com/Dakraid/7DTDModUtil/blob/master/godepgraph.png "Go Dependency Graph")
