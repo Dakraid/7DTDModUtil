@@ -94,6 +94,7 @@ func main() {
 	wnd := nucular.NewMasterWindow(0, "7DTD ModUtil", updatefn)
 	wnd.SetStyle(style.FromTheme(style.DarkTheme, 1.0))
 	readConfig("preset.xml")
+    // TODO: If user.xml doesn't exist, create it
 	readConfig("user.xml")
 	go func() {
 		for {
