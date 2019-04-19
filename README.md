@@ -1,5 +1,6 @@
 
 # 7DTD Modding Utility
+[![Go Report Card](https://goreportcard.com/badge/github.com/Dakraid/7DTDModUtil)](https://goreportcard.com/report/github.com/Dakraid/7DTDModUtil)
 
 This is a small work-in-progress modding utility I wrote for personal use between me and friends to make our lives easier when playing online collaborative games with mods. 
 
