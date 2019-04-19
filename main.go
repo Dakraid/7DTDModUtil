@@ -186,10 +186,6 @@ func downloadPreset() {
 			resp = client.Do(req)
 			logger.Infof("  %v", resp.HTTPResponse.Status)
 		}
-	} else {
-		prog = 100
-		dmsg = "Preset.xml already downloaded"
-		dcolor = green
 	}
 }
 
