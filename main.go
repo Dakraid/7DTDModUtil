@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"image/color"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/aarzilli/nucular"
 	"github.com/aarzilli/nucular/style"
-
 	"github.com/cavaliercoder/grab"
 	"github.com/google/logger"
 	"github.com/sger/go-hashdir"
@@ -36,24 +36,36 @@ type config struct {
 	Vers    uint8    `xml:"vers"`
 }
 
-// Constant variable declarations
-const logPath = "output.log"
-const confName = "config.xml"
-const moduName = "modutil.xml"
+// Filename declaration
+const (
+	logPath  = "output.log"
+	confName = "config.xml"
+	moduName = "modutil.xml"
+)
+
+// Color declaration
+var (
+	white = color.RGBA{255,255,255,255}
+	green = color.RGBA{0,255,0,255}
+	yellow = color.RGBA{255,255,0,255}
+	orange = color.RGBA{255,127,0,255}
+	red = color.RGBA{255,0,0,255}
+	dcolor = white
+	dmsg []string
+)
 
 // Variable declaration
 var (
 	// Flags for the logger setting up the verbose level
 	verbose = flag.Bool("verbose", false, "print info level logs to stdout")
 
-	lf   = &os.File{}
 	edir = &nucular.TextEditor{}
 	resp = &grab.Response{}
 
 	modu = modutil{}
 	conf = config{}
 
-	dmsg, imsg, prog = "", "Integrity Check", 0
+	imsg, prog = "Integrity Check", 0
 
 )
 
@@ -67,6 +79,31 @@ func check(e error) (haserr bool) {
 	return false
 }
 
+func clog(typein int8, message string) {
+	switch typein {
+	case 0:
+		logger.Info(message)
+		dcolor = green
+		dmsg = append(dmsg, "[INFO] " + message)
+	case 1:
+		logger.Warning(message)
+		dcolor = yellow
+		dmsg = append(dmsg,"[WARNING] " + message)
+	case 2:
+		logger.Error(message)
+		dcolor = orange
+		dmsg = append(dmsg,"[ERROR] " + message)
+	case 3:
+		logger.Fatal(message)
+		dcolor = red
+		dmsg = append(dmsg,"[FATAL] " + message)
+	}
+	if len(dmsg) > 4 {
+		dmsg[0] = ""
+		dmsg = dmsg[1:]
+	}
+}
+
 ////////////////////
 // Main Functions //
 ////////////////////
@@ -75,12 +112,11 @@ func check(e error) (haserr bool) {
 // Sets up the logger, reads the config files, and sets up the UI
 // then all work is passed to the UI update function and buttons
 func main() {
-	var err error
 	flag.Parse()
 
-	lf, err = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
+	lf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY, 0660)
 	if err != nil {
-		logger.Fatalf("Failed to open log file: %v", err)
+		clog(3,fmt.Sprintf("Failed to open log file: %v", err))
 	}
 	defer lf.Close()
 
@@ -92,8 +128,8 @@ func main() {
 	// Always recreate the modutil.xml to have the most recent version
 	createModConfig()
 	// Read the configuration files
-	readXML(moduName, modu)
-	readXML(confName, conf)
+	readXML(moduName)
+	readXML(confName)
 
 	// This go function call is responsible to refresh the UI by calling wnd.changed every second
 	go func() {
@@ -103,6 +139,7 @@ func main() {
 		}
 	}()
 
+	clog(0,"Welcome to 7DTD ModUtil")
 	wnd.Main()
 }
 
@@ -120,9 +157,13 @@ func updatefn(w *nucular.Window) {
 
 	w.Row(10).Dynamic(1)
 
-	w.Row(40).Ratio(0.4, 0.6)
-	w.Label("Please set your 7DTD directory:", "LC")
+	w.Row(40).Ratio(0.3, 0.6, 0.1)
+	w.Label("Set your 7DTD directory:", "LC")
 	edir.Edit(w)
+	edir.Flags = nucular.EditClipboard | nucular.EditSigEnter
+	if w.ButtonText("Set") {
+		setInstallDir()
+	}
 
 	w.Row(20).Dynamic(1)
 
@@ -156,11 +197,11 @@ func updatefn(w *nucular.Window) {
 	w.Row(20).Dynamic(1)
 	w.Progress(&prog, 100, false)
 
-	w.Row(20).Dynamic(1)
-	w.Label(dmsg, "LT")
+	w.Row(0).Dynamic(1)
+	w.LabelColored(strings.Join(dmsg,"\n"), "LT", dcolor)
 
 	// If there is data being transmitted we execute the updateProgress function
-	if resp.BytesPerSecond() > 0 {
+	if resp.BytesPerSecond() > 10 {
 		updateProgress()
 	}
 }
@@ -172,19 +213,15 @@ func updatefn(w *nucular.Window) {
 // This refreshes the values for the progress display and is called within the main UI function
 func updateProgress() {
 	if !resp.IsComplete() {
-		logger.Infof("Transferred %v / %v bytes (%.2f%%)", resp.BytesComplete(), resp.Size, 100*resp.Progress())
+		clog(0,fmt.Sprintf("Transferred %v / %v bytes (%.2f%%)", resp.BytesComplete(), resp.Size, 100*resp.Progress()))
 		prog = int(100 * resp.Progress())
 	} else {
 		if err := resp.Err(); err != nil {
-			logger.Errorf("Download failed: %v", err)
+			clog(2,fmt.Sprintf("Download failed: %v", err))
 		} else {
-			logger.Infof("Download saved to ./%v", resp.Filename)
+			clog(0,fmt.Sprintf("Download saved to ./%v", resp.Filename))
 		}
 	}
-}
-
-func updateTicker() {
-	// TODO: Implement Ticker
 }
 
 ///////////////////
@@ -199,8 +236,8 @@ func createModConfig() {
 			req, _ := grab.NewRequest(".", "https://mods.netrve.net/7D2D/"+moduName)
 			resp = client.Do(req)
 
-			logger.Infof("Downloading %v...", req.URL())
-			logger.Infof("  %v", resp.HTTPResponse.Status)
+			clog(0,fmt.Sprintf("Downloading %v...", req.URL()))
+			clog(0,fmt.Sprintf("  %v", resp.HTTPResponse.Status))
 		}
 	}
 }
@@ -214,11 +251,11 @@ func createUserConfig() {
 	err = ioutil.WriteFile(absPath, output, 0644)
 	check(err)
 
-	logger.Info("Created " + confName)
+	clog(0,fmt.Sprintf("Created " + confName))
 }
 
 // Reads the given XML
-func readXML(filename string, target interface{}) {
+func readXML(filename string) {
 	absPath, _ := filepath.Abs(filename)
 	xmlFile, err := os.Open(absPath)
 	if check(err) {
@@ -234,7 +271,12 @@ func readXML(filename string, target interface{}) {
 	data, err := ioutil.ReadAll(xmlFile)
 	check(err)
 
-	err = xml.Unmarshal([]byte(data), &target)
+	switch filename {
+	case confName:
+		err = xml.Unmarshal([]byte(data), &conf)
+	case moduName:
+		err = xml.Unmarshal([]byte(data), &modu)
+	}
 	check(err)
 
 	edir.InsertMode = true
@@ -251,7 +293,17 @@ func writeXML(filename string) {
 	err = ioutil.WriteFile(absPath, output, 0644)
 	check(err)
 
-	logger.Info("Finished writing " + filename)
+	clog(0,fmt.Sprintf("Finished writing " + filename))
+}
+
+func setInstallDir() {
+	conf.Idir = string(edir.Buffer)
+	clog(0,fmt.Sprintf("Install directory set, don't forget to save!"))
+}
+
+func setInstallVers(input string) {
+	conf.Idir = input
+	clog(0,"Version set to " + input)
 }
 
 /////////////////////////
@@ -289,25 +341,31 @@ func genHash(filein string, isdir bool) string {
 func checkIntegrity() bool {
 	var hash1, hash2, hash3 string
 
-	hash1 = genHash(conf.Idir+"\\Data\\Config\\Localization.txt", false)
-	hash2 = genHash(conf.Idir+"\\Data\\Config\\Localization - Quest.txt", false)
-	hash3 = genHash(conf.Idir+"\\Mods", true)
+	if len(conf.Idir) > 0 {
+		hash1 = genHash(conf.Idir+"\\Data\\Config\\Localization.txt", false)
+		hash2 = genHash(conf.Idir+"\\Data\\Config\\Localization - Quest.txt", false)
+		hash3 = genHash(conf.Idir+"\\Mods", true)
 
-	logger.Infof("Hash 1: %s | Hash 2: %s | Hash 3: %s", hash1, hash2, hash3)
+		clog(0,fmt.Sprintf("Hash 1: %s | Hash 2: %s | Hash 3: %s", hash1, hash2, hash3))
 
-	pass1 := strings.EqualFold(hash1, modu.Lhash)
-	pass2 := strings.EqualFold(hash2, modu.Qhash)
-	pass3 := strings.EqualFold(hash3, modu.Mhash)
+		pass1 := strings.EqualFold(hash1, modu.Lhash)
+		pass2 := strings.EqualFold(hash2, modu.Qhash)
+		pass3 := strings.EqualFold(hash3, modu.Mhash)
 
-	logger.Infof("Pass 1: %t | Pass 2: %t | Pass 3: %t", pass1, pass2, pass3)
+		clog(0,fmt.Sprintf("Pass 1: %t | Pass 2: %t | Pass 3: %t", pass1, pass2, pass3))
 
-	imsg = fmt.Sprintf("Localization.txt: %t \nLocalization - Quest.txt: %t \nMods: %t", pass1, pass2, pass3)
+		imsg = fmt.Sprintf("Localization.txt: %t \nLocalization - Quest.txt: %t \nMods: %t", pass1, pass2, pass3)
 
-	if pass1 && pass2 && pass3 {
-		return true
+		if pass1 && pass2 && pass3 {
+			return true
+		}
+
+		return false
+	} else {
+		clog(1,"Install directory is not set")
+
+		return false
 	}
-
-	return false
 }
 
 ////////////////////////
@@ -321,14 +379,14 @@ func downloadBase() {
 			if os.IsNotExist(err) {
 				client := grab.NewClient()
 				req, _ := grab.NewRequest(".", modu.Durl+"7DTD_BASE.7z")
-				logger.Infof("Downloading %v...", req.URL())
+				clog(0,fmt.Sprintf("Downloading %v...", req.URL()))
 				resp = client.Do(req)
 
-				logger.Infof("  %v", resp.HTTPResponse.Status)
+				clog(0,fmt.Sprintf("  %v", resp.HTTPResponse.Status))
 			}
 		} else {
 			prog = 100
-			logger.Info("File 7DTD_BASE already exists")
+			clog(0,"File 7DTD_BASE already exists")
 		}
 	}
 }
