@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/xml"
@@ -19,7 +18,6 @@ import (
 	"github.com/aarzilli/nucular/style"
 	"github.com/cavaliercoder/grab"
 	"github.com/google/logger"
-	"github.com/kjk/lzmadec"
 	"github.com/sger/go-hashdir"
 )
 
@@ -223,8 +221,6 @@ func updateProgress() {
 	} else {
 		if err := resp.Err(); err != nil {
 			clog(2, fmt.Sprintf("Download failed: %v", err))
-		} else {
-			clog(0, fmt.Sprintf("Download saved to ./%v", resp.Filename))
 		}
 	}
 }
@@ -412,26 +408,7 @@ func downloadUpdate() {
 
 func installBase() {
 	if conf.Vers < 1 {
-		var archive *lzmadec.Archive
-		archive, _ = lzmadec.NewArchive("7DTD_BASE.7z")
-
-		// list all files inside archive
-		for _, e := range archive.Entries {
-			fmt.Printf("name: %s, size: %d\n", e.Path, e.Size)
-		}
-		firstFile := archive.Entries[0].Path
-
-		// extract to a file
-		archive.ExtractToFile(firstFile+".extracted", firstFile)
-
-		// decompress to in-memory buffer
-		r, _ := archive.GetFileReader(firstFile)
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, r)
-		// if not fully read, calling Close() ensures that sub-launched 7z executable
-		// is terminated
-		r.Close()
-		fmt.Printf("size of file %s after decompression: %d\n", firstFile, len(buf.Bytes()))
+		// TODO: Implement Base Install
 	}
 }
 
