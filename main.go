@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/xml"
@@ -18,6 +19,7 @@ import (
 	"github.com/aarzilli/nucular/style"
 	"github.com/cavaliercoder/grab"
 	"github.com/google/logger"
+	"github.com/kjk/lzmadec"
 	"github.com/sger/go-hashdir"
 )
 
@@ -45,14 +47,18 @@ const (
 
 // Color declaration
 var (
-	white = color.RGBA{255,255,255,255}
-	green = color.RGBA{0,255,0,255}
-	yellow = color.RGBA{255,255,0,255}
-	orange = color.RGBA{255,127,0,255}
-	red = color.RGBA{255,0,0,255}
+	white  = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	green  = color.RGBA{G: 255, A: 255}
+	yellow = color.RGBA{R: 255, G: 255, A: 255}
+	orange = color.RGBA{R: 255, G: 127, A: 255}
+	red    = color.RGBA{R: 255, A: 255}
 	dcolor = white
-	dmsg []string
+	dmsg   []string
 )
+
+type ecs struct {
+	// Muffin
+}
 
 // Variable declaration
 var (
@@ -66,7 +72,6 @@ var (
 	conf = config{}
 
 	imsg, prog = "Integrity Check", 0
-
 )
 
 // Error check function
@@ -84,19 +89,19 @@ func clog(typein int8, message string) {
 	case 0:
 		logger.Info(message)
 		dcolor = green
-		dmsg = append(dmsg, "[INFO] " + message)
+		dmsg = append(dmsg, "[INFO] "+message)
 	case 1:
 		logger.Warning(message)
 		dcolor = yellow
-		dmsg = append(dmsg,"[WARNING] " + message)
+		dmsg = append(dmsg, "[WARNING] "+message)
 	case 2:
 		logger.Error(message)
 		dcolor = orange
-		dmsg = append(dmsg,"[ERROR] " + message)
+		dmsg = append(dmsg, "[ERROR] "+message)
 	case 3:
 		logger.Fatal(message)
 		dcolor = red
-		dmsg = append(dmsg,"[FATAL] " + message)
+		dmsg = append(dmsg, "[FATAL] "+message)
 	}
 	if len(dmsg) > 4 {
 		dmsg[0] = ""
@@ -116,7 +121,7 @@ func main() {
 
 	lf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY, 0660)
 	if err != nil {
-		clog(3,fmt.Sprintf("Failed to open log file: %v", err))
+		clog(3, fmt.Sprintf("Failed to open log file: %v", err))
 	}
 	defer lf.Close()
 
@@ -139,7 +144,7 @@ func main() {
 		}
 	}()
 
-	clog(0,"Welcome to 7DTD ModUtil")
+	clog(0, "Welcome to 7DTD ModUtil")
 	wnd.Main()
 }
 
@@ -198,7 +203,7 @@ func updatefn(w *nucular.Window) {
 	w.Progress(&prog, 100, false)
 
 	w.Row(0).Dynamic(1)
-	w.LabelColored(strings.Join(dmsg,"\n"), "LT", dcolor)
+	w.LabelColored(strings.Join(dmsg, "\n"), "LT", dcolor)
 
 	// If there is data being transmitted we execute the updateProgress function
 	if resp.BytesPerSecond() > 10 {
@@ -213,13 +218,13 @@ func updatefn(w *nucular.Window) {
 // This refreshes the values for the progress display and is called within the main UI function
 func updateProgress() {
 	if !resp.IsComplete() {
-		clog(0,fmt.Sprintf("Transferred %v / %v bytes (%.2f%%)", resp.BytesComplete(), resp.Size, 100*resp.Progress()))
+		clog(0, fmt.Sprintf("Transferred %v / %v bytes (%.2f%%)", resp.BytesComplete(), resp.Size, 100*resp.Progress()))
 		prog = int(100 * resp.Progress())
 	} else {
 		if err := resp.Err(); err != nil {
-			clog(2,fmt.Sprintf("Download failed: %v", err))
+			clog(2, fmt.Sprintf("Download failed: %v", err))
 		} else {
-			clog(0,fmt.Sprintf("Download saved to ./%v", resp.Filename))
+			clog(0, fmt.Sprintf("Download saved to ./%v", resp.Filename))
 		}
 	}
 }
@@ -236,8 +241,8 @@ func createModConfig() {
 			req, _ := grab.NewRequest(".", "https://mods.netrve.net/7D2D/"+moduName)
 			resp = client.Do(req)
 
-			clog(0,fmt.Sprintf("Downloading %v...", req.URL()))
-			clog(0,fmt.Sprintf("  %v", resp.HTTPResponse.Status))
+			clog(0, fmt.Sprintf("Downloading %v...", req.URL()))
+			clog(0, fmt.Sprintf("  %v", resp.HTTPResponse.Status))
 		}
 	}
 }
@@ -251,7 +256,7 @@ func createUserConfig() {
 	err = ioutil.WriteFile(absPath, output, 0644)
 	check(err)
 
-	clog(0,fmt.Sprintf("Created " + confName))
+	clog(0, fmt.Sprintf("Created "+confName))
 }
 
 // Reads the given XML
@@ -264,6 +269,8 @@ func readXML(filename string) {
 			createUserConfig()
 		case moduName:
 			createModConfig()
+		default:
+			logger.Fatal("Unrecognized input file")
 		}
 	}
 	defer xmlFile.Close()
@@ -276,6 +283,8 @@ func readXML(filename string) {
 		err = xml.Unmarshal([]byte(data), &conf)
 	case moduName:
 		err = xml.Unmarshal([]byte(data), &modu)
+	default:
+		logger.Fatal("Unrecognized input file")
 	}
 	check(err)
 
@@ -293,17 +302,17 @@ func writeXML(filename string) {
 	err = ioutil.WriteFile(absPath, output, 0644)
 	check(err)
 
-	clog(0,fmt.Sprintf("Finished writing " + filename))
+	clog(0, fmt.Sprintf("Finished writing "+filename))
 }
 
 func setInstallDir() {
 	conf.Idir = string(edir.Buffer)
-	clog(0,fmt.Sprintf("Install directory set, don't forget to save!"))
+	clog(0, fmt.Sprintf("Install directory set, don't forget to save!"))
 }
 
 func setInstallVers(input string) {
 	conf.Idir = input
-	clog(0,"Version set to " + input)
+	clog(0, "Version set to "+input)
 }
 
 /////////////////////////
@@ -346,13 +355,13 @@ func checkIntegrity() bool {
 		hash2 = genHash(conf.Idir+"\\Data\\Config\\Localization - Quest.txt", false)
 		hash3 = genHash(conf.Idir+"\\Mods", true)
 
-		clog(0,fmt.Sprintf("Hash 1: %s | Hash 2: %s | Hash 3: %s", hash1, hash2, hash3))
+		clog(0, fmt.Sprintf("Hash 1: %s | Hash 2: %s | Hash 3: %s", hash1, hash2, hash3))
 
 		pass1 := strings.EqualFold(hash1, modu.Lhash)
 		pass2 := strings.EqualFold(hash2, modu.Qhash)
 		pass3 := strings.EqualFold(hash3, modu.Mhash)
 
-		clog(0,fmt.Sprintf("Pass 1: %t | Pass 2: %t | Pass 3: %t", pass1, pass2, pass3))
+		clog(0, fmt.Sprintf("Pass 1: %t | Pass 2: %t | Pass 3: %t", pass1, pass2, pass3))
 
 		imsg = fmt.Sprintf("Localization.txt: %t \nLocalization - Quest.txt: %t \nMods: %t", pass1, pass2, pass3)
 
@@ -362,7 +371,7 @@ func checkIntegrity() bool {
 
 		return false
 	} else {
-		clog(1,"Install directory is not set")
+		clog(1, "Install directory is not set")
 
 		return false
 	}
@@ -379,14 +388,14 @@ func downloadBase() {
 			if os.IsNotExist(err) {
 				client := grab.NewClient()
 				req, _ := grab.NewRequest(".", modu.Durl+"7DTD_BASE.7z")
-				clog(0,fmt.Sprintf("Downloading %v...", req.URL()))
+				clog(0, fmt.Sprintf("Downloading %v...", req.URL()))
 				resp = client.Do(req)
 
-				clog(0,fmt.Sprintf("  %v", resp.HTTPResponse.Status))
+				clog(0, fmt.Sprintf("  %v", resp.HTTPResponse.Status))
 			}
 		} else {
 			prog = 100
-			clog(0,"File 7DTD_BASE already exists")
+			clog(0, "File 7DTD_BASE already exists")
 		}
 	}
 }
@@ -403,7 +412,26 @@ func downloadUpdate() {
 
 func installBase() {
 	if conf.Vers < 1 {
-		// TODO: Implement Base Install
+		var archive *lzmadec.Archive
+		archive, _ = lzmadec.NewArchive("7DTD_BASE.7z")
+
+		// list all files inside archive
+		for _, e := range archive.Entries {
+			fmt.Printf("name: %s, size: %d\n", e.Path, e.Size)
+		}
+		firstFile := archive.Entries[0].Path
+
+		// extract to a file
+		archive.ExtractToFile(firstFile+".extracted", firstFile)
+
+		// decompress to in-memory buffer
+		r, _ := archive.GetFileReader(firstFile)
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		// if not fully read, calling Close() ensures that sub-launched 7z executable
+		// is terminated
+		r.Close()
+		fmt.Printf("size of file %s after decompression: %d\n", firstFile, len(buf.Bytes()))
 	}
 }
 
