@@ -1,0 +1,20 @@
+<!-- There are two configuration files, this one is for the user settings -->
+<config>
+  <!-- 
+	The guid is the unique identifier for the game, this has to be the same across the file server and the archive names
+	It is appended to the end of the server url and the file name, example: https://files.example.com/guid/guid_BASE.zip
+
+	This is usually given to the players so they can enter it themselves
+  -->
+  <guid>7DTD</guid>
+  <!-- 
+	The game directory, can be the root of the game dir or a specific sub folder 
+	It should match the file and directory structure used within the archive
+  -->
+  <idir>G:\SteamLibrary\steamapps\common\7 Days To Die</idir>
+  <!-- 
+	The version of the installed mod pack, 0 means no installed pack, 1 base pack installed, and 1+n is used for patches
+	Should not be modified by hand unless manual action was taken to update or install the pack
+  -->
+  <vers>0</vers>
+</config>

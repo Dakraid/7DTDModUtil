@@ -1,0 +1,25 @@
+<!--
+    There are two configuration files, this one is for the program settings
+    This also needs to be present on the file server under the appropriate server (under the correct guid)
+-->
+
+<modutil>
+  <!-- Address for the file server to be used, needs to be reachable through http(s) -->
+  <server>https://files.example.net/</server>
+  <!-- This is a collection of hashes used within the tool to verify the install -->
+  <hashes>
+	<!-- Each entry is contained within a <hash> bracket -->
+    <hash>
+	  <!-- The SHA-1 hash value itself -->
+      <value>00F714A2C6E07DEEB02B756A0031DF1349DFE97D</value>
+	  <!-- The target for which the hash applies, this can be either a file or directory -->
+      <target>Data/Config/Example.txt</target>
+    </hash>
+    <hash>
+	  <!-- The SHA-1 hash value itself -->
+      <value>4E6F8CB9E2B8AE84D74E15DCD8DC29140A88CBCD</value>
+	  <!-- The target for which the hash applies, this can be either a file or directory -->
+      <target>Data/Mods/</target>
+    </hash>
+  </hashes>
+</modutil>

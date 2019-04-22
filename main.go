@@ -22,18 +22,33 @@ import (
 )
 
 // Type definition for the XML data
+// Application specific configuration
 type modutil struct {
 	XMLName xml.Name `xml:"modutil"`
-	Durl    string   `xml:"durl"`
-	Lhash   string   `xml:"lhash"`
-	Qhash   string   `xml:"qhash"`
-	Mhash   string   `xml:"mhash"`
+	// URL to the server used to download from
+	Server string `xml:"server"`
+	// All hashes to be used to identify mod files
+	Hashes []hashes `xml:"hashes"`
 }
 
+type hashes struct {
+	XMLName xml.Name `xml:"hashes"`
+	// SHA-1 hash itself
+	Hash string `xml:"hash>Value"`
+	// Target that the hash is for, can be dir or file
+	Target string `xml:"hash>Target"`
+}
+
+// User specific configuration
 type config struct {
 	XMLName xml.Name `xml:"config"`
-	Idir    string   `xml:"idir"`
-	Vers    uint8    `xml:"vers"`
+	// Unique game id, used for selecting what game to operate on
+	Guid string `xml:"guid"`
+	// Install directory for the game in question
+	Idir string `xml:"idir"`
+	// Version of the currently installed pack
+	// 0 implies no installed pack, 1 when base pack is applied, 1+n for patches
+	Vers uint8 `xml:"vers"`
 }
 
 // Filename declaration
@@ -54,10 +69,6 @@ var (
 	dmsg   []string
 )
 
-type ecs struct {
-	// Muffin
-}
-
 // Variable declaration
 var (
 	// Flags for the logger setting up the verbose level
@@ -69,7 +80,7 @@ var (
 	modu = modutil{}
 	conf = config{}
 
-	imsg, prog = "Integrity Check", 0
+	imsg, prog, dfin = "Integrity Check", 0, false
 )
 
 // Error check function
@@ -107,9 +118,9 @@ func clog(typein int8, message string) {
 	}
 }
 
-////////////////////
+// //////////////////
 // Main Functions //
-////////////////////
+// //////////////////
 
 // Main function of the program
 // Sets up the logger, reads the config files, and sets up the UI
@@ -125,7 +136,7 @@ func main() {
 
 	defer logger.Init("Logger", *verbose, true, lf).Close()
 
-	wnd := nucular.NewMasterWindow(0, "7DTD ModUtil", updatefn)
+	wnd := nucular.NewMasterWindow(0, "HDN ModUtil", updatefn)
 	wnd.SetStyle(style.FromTheme(style.DarkTheme, 1.0))
 
 	// Always recreate the modutil.xml to have the most recent version
@@ -142,7 +153,7 @@ func main() {
 		}
 	}()
 
-	clog(0, "Welcome to 7DTD ModUtil")
+	clog(0, "Welcome to HDN ModUtil")
 	wnd.Main()
 }
 
@@ -153,7 +164,7 @@ func updatefn(w *nucular.Window) {
 	w.Row(10).Dynamic(1)
 
 	w.Row(40).Ratio(0.7, 0.3)
-	w.Label("7 Days to Die Mod Util", "LC")
+	w.Label("HyperDragonNET Modding Utility", "LC")
 	if w.ButtonText("Save Config") {
 		writeXML(confName)
 	}
@@ -161,7 +172,7 @@ func updatefn(w *nucular.Window) {
 	w.Row(10).Dynamic(1)
 
 	w.Row(40).Ratio(0.3, 0.6, 0.1)
-	w.Label("Set your 7DTD directory:", "LC")
+	w.Label("Set your game directory:", "LC")
 	edir.Edit(w)
 	edir.Flags = nucular.EditClipboard | nucular.EditSigEnter
 	if w.ButtonText("Set") {
@@ -204,14 +215,14 @@ func updatefn(w *nucular.Window) {
 	w.LabelColored(strings.Join(dmsg, "\n"), "LT", dcolor)
 
 	// If there is data being transmitted we execute the updateProgress function
-	if resp.BytesPerSecond() > 10 {
+	if resp.BytesPerSecond() > 0 {
 		updateProgress()
 	}
 }
 
-///////////////////////
+// /////////////////////
 // Refresh functions //
-///////////////////////
+// /////////////////////
 
 // This refreshes the values for the progress display and is called within the main UI function
 func updateProgress() {
@@ -222,19 +233,23 @@ func updateProgress() {
 		if err := resp.Err(); err != nil {
 			clog(2, fmt.Sprintf("Download failed: %v", err))
 		}
+		if !dfin {
+			dfin = true
+			clog(0,"Download finished:"+conf.Guid+"_BASE.7z")
+		}
 	}
 }
 
-///////////////////
+// /////////////////
 // XML functions //
-///////////////////
+// /////////////////
 
 // Handles the download of the primary XML through HTTP
 func createModConfig() {
 	if _, err := os.Stat(moduName); err != nil {
 		if os.IsNotExist(err) {
 			client := grab.NewClient()
-			req, _ := grab.NewRequest(".", "https://mods.netrve.net/7D2D/"+moduName)
+			req, _ := grab.NewRequest(".", "https://mods.netrve.net/"+conf.Guid+"/"+moduName)
 			resp = client.Do(req)
 
 			clog(0, fmt.Sprintf("Downloading %v...", req.URL()))
@@ -311,16 +326,28 @@ func setInstallVers(input string) {
 	clog(0, "Version set to "+input)
 }
 
-/////////////////////////
+// ///////////////////////
 // Integrity functions //
-/////////////////////////
+// ///////////////////////
+
+// Used for determining target type
+func isDirectory(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil{
+		return false, err
+	}
+	return fileInfo.IsDir(), err
+}
 
 // Generates a SHA-1 for either a given file or directory, based on the second parameter
-func genHash(filein string, isdir bool) string {
+func genHash(target string) string {
 	var result string
 
+	isdir, err := isDirectory(conf.Idir+target)
+	check(err)
+
 	if !isdir {
-		f, err := os.Open(filein)
+		f, err := os.Open(conf.Idir+target)
 		check(err)
 		defer f.Close()
 
@@ -331,7 +358,7 @@ func genHash(filein string, isdir bool) string {
 
 		result = hex.EncodeToString(h.Sum(nil))
 	} else {
-		hash, err := hashdir.Create(conf.Idir+"\\Mods", "sha1")
+		hash, err := hashdir.Create(conf.Idir+target, "sha1")
 		check(err)
 
 		result = hash
@@ -344,26 +371,12 @@ func genHash(filein string, isdir bool) string {
 // We use genHash to generate the SHA-1 hashes for the specified files
 // and compare those with the hashes retrieved from the preset.xml
 func checkIntegrity() bool {
-	var hash1, hash2, hash3 string
 
 	if len(conf.Idir) > 0 {
-		hash1 = genHash(conf.Idir+"\\Data\\Config\\Localization.txt", false)
-		hash2 = genHash(conf.Idir+"\\Data\\Config\\Localization - Quest.txt", false)
-		hash3 = genHash(conf.Idir+"\\Mods", true)
 
-		clog(0, fmt.Sprintf("Hash 1: %s | Hash 2: %s | Hash 3: %s", hash1, hash2, hash3))
 
-		pass1 := strings.EqualFold(hash1, modu.Lhash)
-		pass2 := strings.EqualFold(hash2, modu.Qhash)
-		pass3 := strings.EqualFold(hash3, modu.Mhash)
 
-		clog(0, fmt.Sprintf("Pass 1: %t | Pass 2: %t | Pass 3: %t", pass1, pass2, pass3))
-
-		imsg = fmt.Sprintf("Localization.txt: %t \nLocalization - Quest.txt: %t \nMods: %t", pass1, pass2, pass3)
-
-		if pass1 && pass2 && pass3 {
-			return true
-		}
+		// imsg = fmt.Sprintf("Localization.txt: %t \nLocalization - Quest.txt: %t \nMods: %t", pass1, pass2, pass3)
 
 		return false
 	} else {
@@ -373,25 +386,27 @@ func checkIntegrity() bool {
 	}
 }
 
-////////////////////////
+// //////////////////////
 // Download Functions //
-////////////////////////
+// //////////////////////
 
 // Handles the main download for the BASE pack on which everything else is applied on top of
 func downloadBase() {
 	if conf.Vers < 1 {
-		if _, err := os.Stat("7DTD_BASE.7z"); err != nil {
+		if _, err := os.Stat(conf.Guid+"_BASE.7z"); err != nil {
 			if os.IsNotExist(err) {
 				client := grab.NewClient()
-				req, _ := grab.NewRequest(".", modu.Durl+"7DTD_BASE.7z")
+				req, _ := grab.NewRequest(".", modu.Server+conf.Guid+"/"+conf.Guid+"_BASE.zip")
 				clog(0, fmt.Sprintf("Downloading %v...", req.URL()))
 				resp = client.Do(req)
 
 				clog(0, fmt.Sprintf("  %v", resp.HTTPResponse.Status))
+
+				dfin = false
 			}
 		} else {
 			prog = 100
-			clog(0, "File 7DTD_BASE already exists")
+			clog(0, "File already exists")
 		}
 	}
 }
@@ -402,9 +417,9 @@ func downloadUpdate() {
 	}
 }
 
-///////////////////////
+// /////////////////////
 // Install Functions //
-///////////////////////
+// /////////////////////
 
 func installBase() {
 	if conf.Vers < 1 {

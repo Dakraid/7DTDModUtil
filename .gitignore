@@ -93,8 +93,8 @@ $RECYCLE.BIN/
 
 ### Custom Ignores
 /.idea/
-*.xml
-*.log
+/bin/*.xml
+/bin/*.log
 
 /VERSION.cache
 /bin/
@@ -121,4 +121,3 @@ $RECYCLE.BIN/
 /test/pass.out
 /test/run.out
 /test/times.out
-/7DTD_BASE.7z
