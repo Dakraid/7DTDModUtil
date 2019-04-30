@@ -1,6 +1,6 @@
 
 # HyperDragonNET Modding Utility
-[![Go Report Card](https://goreportcard.com/badge/github.com/Dakraid/HDN-ModUtil)](https://goreportcard.com/report/github.com/Dakraid/HDN-ModUtil)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Dakraid/HDN-ModUtil)](https://goreportcard.com/report/github.com/Dakraid/HDN-ModUtil) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/04f938b6805a4b3abb64b71e4ba579dd)](https://www.codacy.com/app/Dakraid/7DTDModUtil?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Dakraid/7DTDModUtil&amp;utm_campaign=Badge_Grade)
 
 This is a small work-in-progress modding utility I wrote for personal use between me and friends to make our lives easier when playing online collaborative games with mods. 
 
